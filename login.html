@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Login | CodeReviewAI</title>
+
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+
+<body class="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 via-indigo-950 to-black text-white">
+
+<div class="w-full max-w-md bg-slate-900/90 p-8 rounded-xl shadow-2xl">
+
+  <h1 class="text-3xl font-bold text-center mb-2">
+    🤖 CodeReviewAI
+  </h1>
+
+  <p class="text-center text-slate-400 mb-6">
+    AI-Powered Code Analysis & Rewriting
+  </p>
+
+  <!-- TABS -->
+  <div class="flex mb-6">
+
+    <button id="loginTab"
+      onclick="setMode('login')"
+      class="flex-1 py-2 bg-blue-600 rounded-l font-semibold">
+
+      Login
+    </button>
+
+    <button id="signupTab"
+      onclick="setMode('signup')"
+      class="flex-1 py-2 bg-slate-700 rounded-r font-semibold">
+
+      Sign Up
+    </button>
+
+  </div>
+
+  <!-- USERNAME -->
+  <label class="block mb-2">
+    Username
+  </label>
+
+  <input id="username"
+    class="w-full p-3 mb-4 rounded bg-slate-800 text-white outline-none"
+    placeholder="Enter username" />
+
+  <!-- EMAIL -->
+  <div id="emailBox" class="hidden">
+
+    <label class="block mb-2">
+      Email
+    </label>
+
+    <input id="email"
+      class="w-full p-3 mb-4 rounded bg-slate-800 text-white outline-none"
+      placeholder="Enter email" />
+
+  </div>
+
+  <!-- PASSWORD -->
+  <label class="block mb-2">
+    Password
+  </label>
+
+  <input id="password"
+    type="password"
+    class="w-full p-3 rounded bg-slate-800 text-white outline-none"
+    placeholder="Enter password" />
+
+  <!-- FORGOT PASSWORD -->
+  <div class="flex justify-end mt-2 mb-6">
+
+    <button onclick="forgotPassword()"
+      class="text-blue-400 text-sm hover:underline">
+
+      Forgot Password?
+
+    </button>
+
+  </div>
+
+  <!-- BUTTON -->
+  <button onclick="submitAuth()"
+    class="w-full py-3 rounded bg-gradient-to-r from-blue-600 to-violet-600 font-semibold hover:opacity-90">
+
+    Continue
+
+  </button>
+
+  <p id="error"
+    class="text-red-400 mt-4 text-center"></p>
+
+</div>
+
+<script>
+
+let mode = "login";
+
+const API = "http://127.0.0.1:8000";
+
+/* ================= MODE ================= */
+
+function setMode(m) {
+
+  mode = m;
+
+  document.getElementById("emailBox")
+    .classList.toggle("hidden", m === "login");
+
+  document.getElementById("loginTab").className =
+    m === "login"
+      ? "flex-1 py-2 bg-blue-600 rounded-l font-semibold"
+      : "flex-1 py-2 bg-slate-700 rounded-l font-semibold";
+
+  document.getElementById("signupTab").className =
+    m === "signup"
+      ? "flex-1 py-2 bg-blue-600 rounded-r font-semibold"
+      : "flex-1 py-2 bg-slate-700 rounded-r font-semibold";
+}
+
+/* ================= LOGIN/SIGNUP ================= */
+
+async function submitAuth() {
+
+  const username =
+    document.getElementById("username").value.trim();
+
+  const password =
+    document.getElementById("password").value.trim();
+
+  const email =
+    document.getElementById("email").value.trim();
+
+  const error =
+    document.getElementById("error");
+
+  error.innerText = "";
+
+  if (!username || !password || (mode === "signup" && !email)) {
+
+    error.innerText =
+      "⚠️ Please fill all fields";
+
+    return;
+  }
+
+  const payload =
+    mode === "signup"
+      ? { username, email, password }
+      : { username, password };
+
+  try {
+
+    const res = await fetch(`${API}/${mode}`, {
+
+      method: "POST",
+
+      headers: {
+        "Content-Type": "application/json"
+      },
+
+      body: JSON.stringify(payload),
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) {
+
+      error.innerText =
+        data.detail || "❌ Failed";
+
+      return;
+    }
+
+    if (mode === "login") {
+
+      localStorage.setItem("auth", "true");
+
+      localStorage.setItem("user", data.username);
+
+      window.location.href =
+        "dashboard.html";
+    }
+
+    else {
+
+      error.innerText =
+        "✅ Signup successful. Please login.";
+
+      setMode("login");
+    }
+
+  }
+
+  catch {
+
+    error.innerText =
+      "❌ Backend not reachable";
+  }
+}
+
+/* ================= FORGOT PASSWORD ================= */
+
+async function forgotPassword() {
+
+  const username =
+    prompt("Enter your username");
+
+  if (!username) return;
+
+  try {
+
+    const response = await fetch(
+      `${API}/forgot-password`,
+      {
+
+        method: "POST",
+
+        headers: {
+          "Content-Type": "application/json"
+        },
+
+        body: JSON.stringify({
+          username
+        })
+
+      }
+    );
+
+    const data = await response.json();
+
+    if (!response.ok) {
+
+      alert(data.detail);
+
+      return;
+    }
+
+    const otp =
+      prompt("Enter OTP sent to email");
+
+    if (!otp) return;
+
+    const newPassword =
+      prompt("Enter new password");
+
+    if (!newPassword) return;
+
+    const resetResponse = await fetch(
+      `${API}/reset-password`,
+      {
+
+        method: "POST",
+
+        headers: {
+          "Content-Type": "application/json"
+        },
+
+        body: JSON.stringify({
+          username,
+          otp,
+          new_password: newPassword
+        })
+
+      }
+    );
+
+    const resetData =
+      await resetResponse.json();
+
+    if (!resetResponse.ok) {
+
+      alert(resetData.detail);
+
+      return;
+    }
+
+    alert("✅ Password reset successful");
+
+  }
+
+  catch {
+
+    alert("❌ Backend not reachable");
+  }
+}
+
+</script>
+
+</body>
+</html>

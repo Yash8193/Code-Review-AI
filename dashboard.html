@@ -1,0 +1,593 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+
+<meta charset="UTF-8" />
+
+<title>Dashboard | CodeReviewAI</title>
+
+<script src="https://cdn.tailwindcss.com"></script>
+
+</head>
+
+<body class="bg-gradient-to-br from-slate-950 to-slate-900 text-white min-h-screen p-8">
+
+<script>
+
+if (
+  localStorage.getItem("auth") !== "true"
+) {
+
+  window.location.replace("login.html");
+}
+
+</script>
+
+<!-- ================= HEADER ================= -->
+
+<header class="flex justify-between items-center mb-8">
+
+  <div>
+
+    <h1 class="text-3xl font-bold">
+      🤖 AI Code Review & Rewrite
+    </h1>
+
+    <p class="text-slate-400 mt-1">
+
+      Welcome,
+      <span id="usernameDisplay"></span>
+
+    </p>
+
+  </div>
+
+  <button
+    onclick="logout()"
+    class="bg-red-600 px-4 py-2 rounded-xl text-sm hover:bg-red-700 transition">
+
+    Logout
+
+  </button>
+
+</header>
+
+<!-- ================= MAIN ================= -->
+
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+  <!-- ================= LEFT ================= -->
+
+  <div class="bg-slate-800 p-6 rounded-2xl shadow-xl">
+
+    <h2 class="text-lg font-semibold mb-4">
+
+      Paste Your Code
+
+    </h2>
+
+    <textarea
+      id="codeInput"
+      class="w-full h-80 p-4 bg-slate-900 rounded-xl text-white outline-none border border-slate-700 font-mono"
+      placeholder="Paste your code here..."></textarea>
+
+    <h2 class="text-lg font-semibold mt-5 mb-4">
+
+      Choose Your Language
+
+    </h2>
+
+    <select
+      id="language"
+      class="mb-4 p-3 bg-slate-900 rounded-xl w-full text-white border border-slate-700">
+
+      <option>Python</option>
+      <option>Java</option>
+      <option>JavaScript</option>
+      <option>C++</option>
+      <option>C#</option>
+      <option>Go</option>
+      <option>Ruby</option>
+      <option>PHP</option>
+      <option>TypeScript</option>
+      <option>Swift</option>
+
+    </select>
+
+    <div class="flex gap-4 mt-5">
+
+      <button
+        onclick="reviewCode()"
+        class="flex-1 bg-blue-600 py-3 rounded-xl hover:bg-blue-700 transition">
+
+        Review Code
+
+      </button>
+
+      <button
+        onclick="rewriteCode()"
+        class="flex-1 bg-green-600 py-3 rounded-xl hover:bg-green-700 transition">
+
+        Rewrite Code
+
+      </button>
+
+    </div>
+
+  </div>
+
+  <!-- ================= RIGHT ================= -->
+
+  <div class="bg-slate-800 p-6 rounded-2xl shadow-xl">
+
+    <h2 class="text-lg font-semibold mb-4">
+
+      AI Output
+
+    </h2>
+
+    <!-- ================= SEVERITY ================= -->
+
+    <div class="grid grid-cols-4 gap-3 mb-5 text-center text-sm font-semibold">
+
+      <button
+        onclick="showSeverity('critical')"
+        class="bg-red-700 p-3 rounded-xl hover:scale-105 transition">
+
+        Critical
+        <span id="critCount">0</span>
+
+      </button>
+
+      <button
+        onclick="showSeverity('high')"
+        class="bg-orange-600 p-3 rounded-xl hover:scale-105 transition">
+
+        High
+        <span id="highCount">0</span>
+
+      </button>
+
+      <button
+        onclick="showSeverity('medium')"
+        class="bg-yellow-500 text-black p-3 rounded-xl hover:scale-105 transition">
+
+        Medium
+        <span id="medCount">0</span>
+
+      </button>
+
+      <button
+        onclick="showSeverity('low')"
+        class="bg-green-600 p-3 rounded-xl hover:scale-105 transition">
+
+        Low
+        <span id="lowCount">0</span>
+
+      </button>
+
+    </div>
+
+    <!-- ================= OUTPUT ================= -->
+
+    <div
+      id="output"
+      class="bg-black p-5 rounded-2xl h-[550px] overflow-y-auto border border-slate-700">
+
+      Click Review Code...
+
+    </div>
+
+  </div>
+
+</div>
+
+<!-- ================= FOOTER ================= -->
+
+<footer class="text-center text-slate-500 mt-10 text-sm">
+
+  Powered by FastAPI + Groq LLaMA
+
+</footer>
+
+<!-- ================= SCRIPT ================= -->
+
+<script>
+
+document.getElementById(
+  "usernameDisplay"
+).innerText =
+  localStorage.getItem("user");
+
+const API =
+  "http://127.0.0.1:8000";
+
+let reviewData = {
+  critical: [],
+  high: [],
+  medium: [],
+  low: []
+};
+
+/* ================= LOGOUT ================= */
+
+function logout() {
+
+  localStorage.clear();
+
+  window.location.replace(
+    "login.html"
+  );
+}
+
+/* ================= RESET ================= */
+
+function resetSeverity() {
+
+  document.getElementById(
+    "critCount"
+  ).innerText = 0;
+
+  document.getElementById(
+    "highCount"
+  ).innerText = 0;
+
+  document.getElementById(
+    "medCount"
+  ).innerText = 0;
+
+  document.getElementById(
+    "lowCount"
+  ).innerText = 0;
+
+  reviewData = {
+    critical: [],
+    high: [],
+    medium: [],
+    low: []
+  };
+}
+
+/* ================= SHOW ================= */
+
+function showSeverity(level) {
+
+  const output =
+    document.getElementById("output");
+
+  output.innerHTML = "";
+
+  const items =
+    reviewData[level];
+
+  if (items.length === 0) {
+
+    output.innerHTML = `
+      <div class="text-gray-400 text-lg">
+        No ${level} issues found
+      </div>
+    `;
+
+    return;
+  }
+
+  let bg = "";
+  let border = "";
+  let text = "";
+
+  if(level === "critical") {
+
+    bg = "bg-red-950/40";
+    border = "border-red-500";
+    text = "text-red-400";
+  }
+
+  else if(level === "high") {
+
+    bg = "bg-orange-950/40";
+    border = "border-orange-500";
+    text = "text-orange-400";
+  }
+
+  else if(level === "medium") {
+
+    bg = "bg-yellow-900/30";
+    border = "border-yellow-500";
+    text = "text-yellow-300";
+  }
+
+  else {
+
+    bg = "bg-green-950/30";
+    border = "border-green-500";
+    text = "text-green-400";
+  }
+
+  items.forEach((item, index) => {
+
+    output.innerHTML += `
+
+      <div class="
+        ${bg}
+        border-l-4
+        ${border}
+        p-4
+        rounded-xl
+        mb-5
+        shadow-lg
+      ">
+
+        <div class="
+          font-bold
+          ${text}
+          mb-3
+          text-xl
+        ">
+
+          ${level.toUpperCase()} ISSUE ${index + 1}
+
+        </div>
+
+        <div class="text-gray-400 mb-3">
+
+          Line ${item.line}
+
+        </div>
+
+        <pre class="
+          bg-black/60
+          p-4
+          rounded-xl
+          overflow-x-auto
+          text-white
+          border
+          ${border}
+          whitespace-pre-wrap
+        ">
+
+${item.code}
+
+        </pre>
+
+      </div>
+    `;
+  });
+}
+
+/* ================= REVIEW ================= */
+
+async function reviewCode() {
+
+  const output =
+    document.getElementById("output");
+
+  const code =
+    document.getElementById("codeInput")
+    .value;
+
+  const language =
+    document.getElementById("language")
+    .value;
+
+  resetSeverity();
+
+  if (!code.trim()) {
+
+    output.innerHTML = `
+      <div class="text-yellow-400 text-lg">
+        ⚠️ Paste code first
+      </div>
+    `;
+
+    return;
+  }
+
+  output.innerHTML = `
+    <div class="text-blue-400 text-lg">
+      Reviewing code... ⏳
+    </div>
+  `;
+
+  try {
+
+    const response = await fetch(
+      `${API}/review`,
+      {
+
+        method: "POST",
+
+        headers: {
+          "Content-Type": "application/json"
+        },
+
+        body: JSON.stringify({
+          code,
+          language
+        })
+
+      }
+    );
+
+    const data =
+      await response.json();
+
+    if (!response.ok) {
+
+      output.innerHTML = `
+        <div class="text-red-400">
+          ❌ Review failed
+        </div>
+      `;
+
+      return;
+    }
+
+    const lines =
+      data.review.split("\n");
+
+    lines.forEach(line => {
+
+      line = line.trim();
+
+      if (!line.includes("|")) return;
+
+      const parts =
+        line.split("|");
+
+      const left =
+        parts[0].trim();
+
+      const codePart =
+        parts[1].trim();
+
+      const severity =
+        left.split(":")[0]
+        .trim()
+        .toLowerCase();
+
+      const lineNumber =
+        left.split(":")[1]
+        ?.trim();
+
+      if (
+        reviewData[severity]
+      ) {
+
+        reviewData[severity].push({
+
+          line: lineNumber,
+
+          code: codePart
+
+        });
+      }
+    });
+
+    document.getElementById(
+      "critCount"
+    ).innerText =
+      reviewData.critical.length;
+
+    document.getElementById(
+      "highCount"
+    ).innerText =
+      reviewData.high.length;
+
+    document.getElementById(
+      "medCount"
+    ).innerText =
+      reviewData.medium.length;
+
+    document.getElementById(
+      "lowCount"
+    ).innerText =
+      reviewData.low.length;
+
+    showSeverity("critical");
+
+  }
+
+  catch {
+
+    output.innerHTML = `
+      <div class="text-red-400 text-lg">
+        ❌ Backend not reachable
+      </div>
+    `;
+  }
+}
+
+/* ================= REWRITE ================= */
+
+async function rewriteCode() {
+
+  const output =
+    document.getElementById("output");
+
+  const code =
+    document.getElementById("codeInput")
+    .value.trim();
+
+  const language =
+    document.getElementById("language")
+    .value;
+
+  if (!code) {
+
+    output.innerHTML = `
+      <div class="text-yellow-400">
+        ⚠️ Paste code first
+      </div>
+    `;
+
+    return;
+  }
+
+  output.innerHTML = `
+    <div class="text-green-400">
+      Rewriting code... ⏳
+    </div>
+  `;
+
+  try {
+
+    const response = await fetch(
+      `${API}/rewrite`,
+      {
+
+        method: "POST",
+
+        headers: {
+          "Content-Type": "application/json"
+        },
+
+        body: JSON.stringify({
+          code,
+          language
+        })
+
+      }
+    );
+
+    const data =
+      await response.json();
+
+    if (!response.ok) {
+
+      output.innerHTML = `
+        <div class="text-red-400">
+          ❌ Rewrite failed
+        </div>
+      `;
+
+      return;
+    }
+
+    output.innerHTML = `
+
+      <pre class="
+        text-green-400
+        whitespace-pre-wrap
+      ">
+
+${data.rewritten_code}
+
+      </pre>
+    `;
+
+  }
+
+  catch {
+
+    output.innerHTML = `
+      <div class="text-red-400">
+        ❌ Backend not reachable
+      </div>
+    `;
+  }
+}
+
+</script>
+
+</body>
+</html>
